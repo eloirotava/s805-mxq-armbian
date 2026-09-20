@@ -164,6 +164,7 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" /mnt/ws1508
 
       - name: Download bootloader
+        if: ${{ (inputs.board || 'mxq-s805') == 'ws1508' }}
         uses: actions/download-artifact@v4
         with:
           name: ws1508-uboot
