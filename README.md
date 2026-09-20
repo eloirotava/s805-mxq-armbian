@@ -1,3 +1,22 @@
+> **Fork.** O original é [dann2333/ws1508-armbian](https://github.com/dann2333/ws1508-armbian),
+> feito para o Xunlei WS1508. Este fork acrescenta uma segunda placa, a
+> **MXQ S805**, para rodar o trabalho de NAND dele num aparelho diferente:
+>
+> - `userpatches/config/boards/mxq-s805.conf`
+> - `userpatches/kernel/archive/meson-6.12/dt/meson8b-mxq-nand.dts`
+> - `userpatches/bootscripts/boot-mxq-s805.cmd` e `userpatches/bootenv/mxq-s805.txt`
+> - escolha de placa no fluxo do GitHub Actions
+>
+> Os cinco patches de kernel são os do autor original, intocados. No MXQ
+> **nada é gravado na NAND nem no bootloader**: a imagem roda do cartão e o
+> MTD nasce somente leitura. O objetivo é medir a geometria do chip
+> (página, OOB, ECC) num S805 real, que é o que falta para decidir o porte.
+>
+> O que já se sabe do aparelho alvo, lido sob o driver 3.10 do fabricante:
+> chip `SDTNRGAMA-008G` de 8 GiB, id `45 de 94 93 76 50 0e 04`, arranjo de
+> OOB `AML_NAND_NEW_OOB`, FTL `NFTL 140911a`, blocos ruins de fábrica 18 a
+> 21, e a tabela de partições vindo da própria NAND, não do device tree.
+
 # ws1508-armbian
 
 给 **迅雷赚钱宝二代 / 赚钱宝 Pro（型号 WS1508）** 移植的 Armbian，

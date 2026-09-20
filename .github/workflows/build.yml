@@ -31,6 +31,14 @@ on:
         options:
           - minimal     # recommended: this board has 512MB of RAM and 4GB of storage
           - cli
+      board:
+        description: 'Which board to build for'
+        required: true
+        default: 'mxq-s805'
+        type: choice
+        options:
+          - mxq-s805    # MXQ S805 (this fork's board: 1GB, 8GB raw NAND)
+          - ws1508      # Xunlei WS1508 (upstream's board)
       root_password:
         description: 'Default root password baked into the image'
         required: false
@@ -80,6 +88,11 @@ jobs:
   # ---------------------------------------------------------------------
   uboot:
     name: Build bootloader
+    # Only for the WS1508. On the MXQ this fork never writes the
+    # bootloader: the box keeps its own, and the image is booted from the
+    # SD card. Flashing the upstream u-boot there would rewrite the NAND
+    # partition table and lose the per-unit keys.
+    if: ${{ (inputs.board || 'mxq-s805') == 'ws1508' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -119,6 +132,9 @@ jobs:
   image:
     name: Build image (${{ inputs.release || 'bookworm' }} / ${{ inputs.build_type || 'minimal' }})
     needs: uboot
+    # The bootloader job is skipped on the MXQ, and a skipped dependency
+    # would take this one with it.
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-24.04
     outputs:
       image_name: ${{ steps.collect.outputs.image_name }}
@@ -169,7 +185,7 @@ jobs:
 
       - name: Build the Armbian image
         env:
-          BOARD: ws1508
+          BOARD: ${{ inputs.board || 'mxq-s805' }}
           BRANCH: ${{ inputs.kernel_branch || 'current' }}
           RELEASE: ${{ inputs.release || 'bookworm' }}
           BUILD_MINIMAL: ${{ (inputs.build_type == 'cli') && 'no' || 'yes' }}
@@ -179,13 +195,19 @@ jobs:
         run: |
           sudo -E bash scripts/build-armbian.sh build
 
+      # Both packages below install through the Amlogic USB Burning Tool
+      # and both rewrite internal storage, so they are built only for the
+      # board they were written for. On the MXQ this fork stays on the SD
+      # card and never touches the vendor bootloader or its NAND layout.
       - name: Pack the direct-flash burn image
+        if: ${{ (inputs.board || 'mxq-s805') == 'ws1508' }}
         run: sudo -E bash scripts/make-burn-image.sh
 
       # The NAND kernel package. Must run before the image is compressed
       # below, because it reads the kernel, initrd and dtb back out of the
       # built .img's boot partition.
       - name: Pack the NAND boot image
+        if: ${{ (inputs.board || 'mxq-s805') == 'ws1508' }}
         run: sudo -E bash scripts/make-nand-image.sh
 
       - name: Collect artifacts

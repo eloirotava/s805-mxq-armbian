@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * MXQ S805 box, with the internal raw NAND enabled.
+ *
+ * Same board as the mainline meson8b-mxq.dts, plus the NAND controller
+ * that meson8b.dtsi grows in ws1508-0104. It exists to find out whether
+ * mainline's meson_nand driver can talk to the flash in these boxes at
+ * all; nothing here is meant to put data on the chip.
+ *
+ * WHAT IS KNOWN ABOUT THE FLASH IN THIS PARTICULAR BOX
+ *
+ * Read under the vendor 3.10 stack (LibreELEC 9.2.8.20, amlnf driver):
+ *
+ *   device id      45 de 94 93 76 50 0e 04
+ *   reported as    "A serials NAND 8GiB SDTNRGAMA-008G"
+ *   oob layout     AML_NAND_NEW_OOB
+ *   ftl            NFTL 140911a, the blob with no source
+ *   shipped bad    blocks 18, 19, 20, 21
+ *   metadata       bbt at block 4, config at 6, keys at 7, u-boot env at 8
+ *   partitions     cache 512M, logo/recovery/misc/boot 32M each,
+ *                  system 1G, data 5.2G -- all NFTL-logical, and the
+ *                  table comes from the flash itself, not from any dtb
+ *
+ * Two consequences for this file:
+ *
+ *   - There is no partitions node. On this box the vendor stack owns the
+ *     whole chip, so there is no region Linux could claim without first
+ *     shrinking the NFTL side, which the vendor tooling does not offer.
+ *     One MTD covering the die is what a read-only probe needs and is the
+ *     most this can honestly declare.
+ *
+ *   - ECC is left to the driver. AML_NAND_NEW_OOB says the vendor wrote
+ *     its pages in a layout mainline does not reproduce, so reads of
+ *     vendor-written pages coming back uncorrectable is an expected
+ *     result here, not a fault to report. Fill in nand-ecc-step-size and
+ *     nand-ecc-strength once real geometry has been read off the part.
+ *
+ * The MTD is read-only unless the kernel is booted with
+ * meson_nand.allow_write=1, and the address guard refuses erase, program,
+ * OOB write and mark-bad in the vendor region whatever that parameter
+ * says. Point nothing but nanddump at it.
+ *
+ * Unlike the WS1508, this board's mainline dts never enables &sdhc, so
+ * nothing has to be disabled here to free the BOOT_x pads: the SD card
+ * slot is on &sdio and keeps working.
+ */
+
+/dts-v1/;
+#include "meson8b-mxq.dts"
+
+/ {
+	model = "MXQ S805 (raw NAND variant)";
+};
+
+&nfc {
+	status = "okay";
+
+	pinctrl-0 = <&nand_pins>;
+	pinctrl-names = "default";
+
+	nand@0 {
+		reg = <0>;
+		nand-rb = <0>;
+		nand-ecc-mode = "hw";
+	};
+};
